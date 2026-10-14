@@ -1,0 +1,893 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Pediatric allergy and immunology clinic progress note builder: atopic dermatitis, asthma, food and drug allergy.">
+<title>Clinic Note Builder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+<style>
+/* Layout: sticky header with condition tabs and section jump bar; question sections on the left, live progress-note text on the right (bottom sheet on phones). Accent follows the condition: rose for atopic dermatitis, blue for asthma, green for food/drug allergy. */
+:root{
+  color-scheme:light;
+  --bg:#F4F6F8; --surface:#FFFFFF; --ink:#16212B; --muted:#5A6A77; --line:#D9E1E7; --field:#FFFFFF;
+  --neg:#44525E; --on:#FFFFFF; --crit:#B42318;
+  --ad:#B2354F; --ad-soft:#FBE8ED; --as:#1D5FAE; --as-soft:#E4EFFB; --fd:#23775A; --fd-soft:#E2F3EC;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E151B; --surface:#16202A; --ink:#E6ECF1; --muted:#9DADBA; --line:#2A3945; --field:#101A22;
+    --neg:#6B7C8A; --on:#0E151B; --crit:#FF8F85;
+    --ad:#EE7B97; --ad-soft:#3A1F29; --as:#78AEEB; --as-soft:#1B2E45; --fd:#6CC79B; --fd-soft:#173528; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E151B; --surface:#16202A; --ink:#E6ECF1; --muted:#9DADBA; --line:#2A3945; --field:#101A22;
+  --neg:#6B7C8A; --on:#0E151B; --crit:#FF8F85;
+  --ad:#EE7B97; --ad-soft:#3A1F29; --as:#78AEEB; --as-soft:#1B2E45; --fd:#6CC79B; --fd-soft:#173528; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:0 100px}
+.app{--accent:var(--ad);--accent-soft:var(--ad-soft);max-width:1240px;margin-inline:auto}
+.app[data-tab="asthma"]{--accent:var(--as);--accent-soft:var(--as-soft)}
+.app[data-tab="food"]{--accent:var(--fd);--accent-soft:var(--fd-soft)}
+button,input,textarea,select{font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.hdr{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:10px 8px;border-bottom:1px solid var(--line)}
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.brand{font-weight:600;font-size:15px;letter-spacing:.01em}
+.brand small{display:block;font-weight:400;font-size:12px;color:var(--muted)}
+.tabs{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.tab{padding:9px 14px;font-weight:600;font-size:14px;border:0;background:transparent;color:var(--ink);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--accent);color:var(--on)}
+.mini{font-size:12.5px;padding:5px 10px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--ink);cursor:pointer}
+.mini:hover{border-color:var(--accent)}
+.mini.warn{border-color:var(--accent);color:var(--accent);font-weight:600}
+.nav{display:flex;gap:6px;overflow-x:auto;padding-top:8px;scrollbar-width:thin}
+.nav button{flex:none;font-size:13px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;white-space:nowrap}
+.nav .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--line);margin-right:6px}
+.nav .on .dot{background:var(--accent)}
+.nav .sk{opacity:.55;text-decoration:line-through}
+.tip{margin:10px 0 0;color:var(--muted);font-size:13px}
+
+.layout{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);padding-top:14px}
+.forms{min-width:0}
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-bottom:12px;scroll-margin-top:calc(var(--hh,120px) + env(safe-area-inset-top,0px) + 8px)}
+.sec-h{display:flex;align-items:center;gap:8px;padding:2px 12px 2px 4px}
+.sec-t{flex:1;min-width:0;display:flex;align-items:baseline;gap:10px;background:none;border:0;padding:12px 8px;text-align:left;color:inherit;cursor:pointer}
+.sec-t::before{content:"";flex:none;width:7px;height:7px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg) translateY(-2px)}
+.sec.closed .sec-t::before{transform:rotate(-45deg)}
+.sec-name{font-weight:600;font-size:16px}
+.sec-meta{color:var(--muted);font-size:12.5px}
+.skip{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.skip input{width:17px;height:17px;accent-color:var(--accent)}
+.sec-b{padding:2px 14px 14px;border-top:1px solid var(--line)}
+.sec.closed .sec-b,.sec.skipped .sec-b{display:none}
+.sec.skipped{opacity:.6}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;padding-top:12px}
+.item{min-width:0;display:block}
+.item.full{grid-column:1/-1}
+.lbl{display:block;font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+input[type="text"],input[type="number"],textarea{width:100%;font-size:16px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--field);color:var(--ink)}
+textarea{resize:vertical}
+select{font-size:16px;padding:6px 4px;border:1px solid var(--line);border-radius:6px;background:var(--field);color:var(--ink);min-width:52px}
+.numwrap{display:flex;align-items:center;gap:8px}
+.numwrap input{max-width:120px}
+.band{font-size:13px;color:var(--accent);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-size:14px;padding:6px 11px;min-height:34px;border:1px solid var(--line);border-radius:999px;background:var(--field);color:var(--ink);cursor:pointer;text-align:left}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.tri-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;flex-wrap:wrap}
+.tri-h .lbl{margin:0}
+.tri-a{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.trows{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:6px 12px}
+.trow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 5px 4px 10px;border:1px solid var(--line);border-radius:8px;background:var(--field)}
+.trow.y{border-color:var(--accent);background:var(--accent-soft)}
+.tl{min-width:0;font-size:14px}
+.pm{display:flex;gap:4px;flex:none}
+.tb{font-size:13px;font-weight:600;padding:6px 10px;min-width:44px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.tb.on.yes{background:var(--accent);border-color:var(--accent);color:var(--on)}
+.tb.on.no{background:var(--neg);border-color:var(--neg);color:var(--on)}
+.q{padding:9px 0;border-top:1px dashed var(--line)}
+.q:first-child{border-top:0;padding-top:2px}
+.qt{font-size:14px;font-weight:500;margin-bottom:6px}
+.easi-wrap{overflow-x:auto}
+.easi{border-collapse:collapse;width:100%;min-width:500px}
+.easi th,.easi td{padding:6px 4px;border-bottom:1px solid var(--line);text-align:center;font-size:13px}
+.easi th{color:var(--muted);font-weight:600}
+.easi th:first-child,.easi td:first-child{text-align:left;font-size:14px;font-weight:500}
+.legend{font-size:12.5px;color:var(--muted);margin-top:6px}
+.info{margin-top:12px;padding:8px 10px;border-radius:8px;background:var(--accent-soft);font-size:13.5px}
+.info div+div{margin-top:3px}
+.info .warnline{color:var(--crit);font-weight:600}
+
+.note{background:var(--surface);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;min-width:0}
+.note-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+.note-h b{font-size:14px}
+.btn{font-size:14px;font-weight:600;padding:9px 16px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--on);cursor:pointer}
+.btn.ghost{background:transparent;color:var(--accent)}
+#note{flex:1;min-height:260px;border:0;border-radius:0;font-family:var(--mono);font-size:13px;line-height:1.5;padding:12px;background:var(--field)}
+.note-f{padding:8px 12px;font-size:12px;color:var(--muted);border-top:1px solid var(--line)}
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;gap:10px;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line)}
+.bar .btn{flex:1}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:8px;font-size:14px;z-index:60;max-width:90vw}
+.foot{margin-top:18px;font-size:12.5px;color:var(--muted);max-width:75ch}
+
+@media (min-width:1000px){
+  .layout{grid-template-columns:minmax(0,1fr) 410px;align-items:start}
+  .note{position:sticky;top:calc(var(--hh,120px) + env(safe-area-inset-top,0px) + 14px);height:calc(100vh - var(--hh,120px) - 40px);height:calc(100dvh - var(--hh,120px) - 40px)}
+  .bar{display:none}
+  body{padding-block:0 40px}
+  .toast{bottom:28px}
+  .note-h .close{display:none}
+}
+@media (max-width:999px){
+  .note{display:none;position:fixed;left:12px;right:12px;bottom:calc(68px + env(safe-area-inset-bottom,0px));max-height:64vh;max-height:64dvh;z-index:30;box-shadow:0 12px 34px rgba(0,0,0,.28)}
+  body.sheet .note{display:flex}
+}
+@media (max-width:560px){
+  .brand small{display:none}
+  .tabs{width:100%}
+  .tab{flex:1;padding:9px 4px;font-size:13px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="app" id="app" data-tab="ad">
+  <header class="hdr" id="hdr">
+    <div class="top">
+      <div class="brand">Allergy-Immunology clinic<small>Progress note builder</small></div>
+      <div class="tabs" role="tablist" aria-label="Condition">
+        <button class="tab" role="tab" id="tab-ad" aria-selected="true" type="button">Atopic dermatitis</button>
+        <button class="tab" role="tab" id="tab-asthma" aria-selected="false" type="button">Asthma</button>
+        <button class="tab" role="tab" id="tab-food" aria-selected="false" type="button">Food / drug allergy</button>
+      </div>
+      <button class="mini" id="reset" type="button">New patient</button>
+    </div>
+    <div id="navs"></div>
+    <p class="tip">Tap Yes / No or a chip. Anything left blank stays out of the note. Scores add up as you answer. Skip drops a whole section. Nothing is saved or sent; avoid typing names or ID numbers.</p>
+  </header>
+
+  <div class="layout">
+    <main class="forms" id="forms"></main>
+    <aside class="note" id="notepanel" aria-label="Progress note">
+      <div class="note-h">
+        <b>Progress note</b>
+        <span style="display:flex;gap:8px">
+          <button class="btn" id="copy1" type="button">Copy note</button>
+          <button class="mini close" id="close" type="button">Close</button>
+        </span>
+      </div>
+      <textarea id="note" spellcheck="false" aria-label="Generated progress note"></textarea>
+      <div class="note-f">Updates as you tap. Typing in this box is replaced when you change the form.</div>
+    </aside>
+  </div>
+
+  <p class="foot">Built from the AAAAI/ACAAI atopic dermatitis practice parameter, AAD atopic dermatitis guidelines, GINA, NAEPP EPR-3 and its 2020 update, the EAACI food allergy and anaphylaxis guidelines, the NIAID/FAAN anaphylaxis criteria, and the EAACI/AAAAI drug allergy practice parameters. Scores: POEM, EASI, C-ACT, ACT, PEN-FAST (adult-validated, limited pediatric data). Item wording is shortened; use the licensed questionnaires where required. Prompts support documentation and do not replace clinical judgment or local protocols.</p>
+</div>
+
+<div class="bar" id="bar">
+  <button class="btn ghost" id="peek" type="button">Preview note</button>
+  <button class="btn" id="copy2" type="button">Copy note</button>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+var $=function(s,r){return (r||document).querySelector(s);};
+function el(t,c,txt){var e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e;}
+var C=function(id,label,opts,o){return Object.assign({t:'c',id:id,label:label,opts:opts},o||{});};
+var T=function(id,label,o){return Object.assign({t:'t',id:id,label:label},o||{});};
+var N=function(id,label,o){return Object.assign({t:'n',id:id,label:label},o||{});};
+var Y=function(id,label,list,o){return Object.assign({t:'y',id:id,label:label,list:list},o||{});};
+var SC=function(id,label,o){return Object.assign({t:'s',id:id,label:label},o||{});};
+
+var SITES=['Face','Scalp','Neck','Eyelids','Ears','Antecubital fossae','Popliteal fossae','Trunk','Extensor limbs','Hands','Feet','Diaper/genital area','Generalized'];
+var FAMHX=['Asthma','Eczema','Allergic rhinitis','Food allergy','Drug allergy','Urticaria','Immunodeficiency','No atopy'];
+
+var poemBand=function(v){return v<=2?'clear/almost clear':v<=7?'mild':v<=16?'moderate':v<=24?'severe':'very severe';};
+var easiBand=function(v){return v===0?'clear':v<=1?'almost clear':v<=7?'mild':v<=21?'moderate':v<=50?'severe':'very severe';};
+var nrsBand=function(v){return v===0?'none':v<=3?'mild':v<=6?'moderate':'severe';};
+var cactBand=function(v){return v>=20?'well controlled':'not well controlled';};
+var actBand=function(v){return v>=20?'well controlled':v>=16?'not well controlled':'very poorly controlled';};
+
+/* ---- scored questionnaires ---- */
+var DAYS=['No days','1-2 days','3-4 days','5-6 days','Every day'];
+var POEM=SC('poem','POEM, past week',{short:'POEM',max:28,min:0,band:poemBand,qs:[
+  {q:'Itchy skin',o:DAYS},{q:'Sleep disturbed by the eczema',o:DAYS},{q:'Bleeding skin',o:DAYS},
+  {q:'Weeping or oozing',o:DAYS},{q:'Cracked skin',o:DAYS},{q:'Flaking off',o:DAYS},{q:'Dry or rough skin',o:DAYS}]});
+var PDAYS=['Every day','19-24 days','11-18 days','4-10 days','1-3 days','None'];
+var FREQ4=['All the time','Most of the time','Some of the time','Never'];
+var CACT=SC('cact','C-ACT (age 4-11)',{short:'C-ACT',max:27,min:0,band:cactBand,qs:[
+  {q:'Child: asthma today',o:['Very bad','Bad','Good','Very good']},
+  {q:'Child: problem when running, exercising or playing',o:['Big problem','Problem','Small problem','No problem']},
+  {q:'Child: cough because of asthma',o:FREQ4},
+  {q:'Child: waking at night because of asthma',o:FREQ4},
+  {q:'Parent: days with daytime asthma symptoms (last 4 weeks)',o:PDAYS},
+  {q:'Parent: days with daytime wheezing (last 4 weeks)',o:PDAYS},
+  {q:'Parent: days child woke at night from asthma (last 4 weeks)',o:PDAYS}]});
+var ACTQ=SC('act','ACT (age 12 and over)',{short:'ACT',max:25,min:1,band:actBand,qs:[
+  {q:'Asthma kept you from usual activities (4 weeks)',o:['All the time','Most of the time','Some of the time','A little of the time','None of the time']},
+  {q:'Shortness of breath',o:['More than once a day','Once a day','3-6 times a week','Once or twice a week','Not at all']},
+  {q:'Night or early-morning waking from asthma',o:['4 or more nights a week','2-3 nights a week','Once a week','Once or twice','Not at all']},
+  {q:'Reliever inhaler or nebulizer use',o:['3 or more times a day','1-2 times a day','2-3 times a week','Once a week or less','Not at all']},
+  {q:'Self-rated asthma control',o:['Not controlled at all','Poorly controlled','Somewhat controlled','Well controlled','Completely controlled']}]});
+var EASIIT={t:'e',id:'easi',label:'EASI by region'};
+var REG=[{n:'Head / neck',m7:0.2,m8:0.1},{n:'Upper limbs',m7:0.2,m8:0.2},{n:'Trunk',m7:0.3,m8:0.3},{n:'Lower limbs',m7:0.3,m8:0.4}];
+var SIGNS=['Erythema','Induration / papulation / edema','Excoriation','Lichenification'];
+var SIGNS_S=['Ery','Ind','Exc','Lic'];
+
+function easiCalc(get){
+  var v=get('easi')||{},ag=get('agey'),known=(ag!==undefined&&String(ag).trim()!==''&&isFinite(Number(ag)));
+  var young=known&&Number(ag)<8,tot=0,ans=0,miss=0,parts=[];
+  REG.forEach(function(r,i){
+    var rv=v['r'+i]||{};
+    if(rv.a===undefined) return;
+    ans++;
+    var sum=0;
+    for(var j=0;j<4;j++){
+      if(rv['s'+j]===undefined){if(rv.a>0) miss++;}else sum+=rv['s'+j];
+    }
+    tot+=sum*rv.a*(young?r.m7:r.m8);
+    parts.push(r.n+' area '+rv.a+', signs '+sum+'/12');
+  });
+  return {tot:Math.round(tot*10)/10,ans:ans,miss:miss,parts:parts,known:known};
+}
+function scoreText(it,get){
+  if(it.t==='s'){
+    var v=get(it.id)||{},tot=0,a=0,n=it.qs.length;
+    for(var i=0;i<n;i++){if(v[i]!==undefined){a++;tot+=v[i];}}
+    if(!a) return null;
+    if(a<n) return it.short+' incomplete ('+a+'/'+n+' items answered, partial sum '+tot+')';
+    return it.short+' '+tot+'/'+it.max+' ('+it.band(tot)+')';
+  }
+  if(it.t==='e'){
+    var r=easiCalc(get);
+    if(!r.ans) return null;
+    var s='EASI '+r.tot+'/72 ('+easiBand(r.tot)+')',f=[];
+    if(r.ans<4) f.push(r.ans+'/4 regions entered');
+    if(r.miss) f.push(r.miss+' blank sign scores counted as 0');
+    if(!r.known) f.push('age not entered, age 8+ multipliers used');
+    return f.length?s+' - '+f.join('; '):s;
+  }
+  return null;
+}
+
+/* ---- asthma control from the four GINA questions ---- */
+var GINA=['Daytime symptoms more than 2x/week (more than 1x/week if age 5 or under)','Night waking or night cough due to asthma','Reliever needed more than 2x/week (more than 1x/week if age 5 or under)','Any activity limitation due to asthma'];
+function ginaCat(get){
+  var y=get('gina')||{},a=0,p=0;
+  GINA.forEach(function(k){if(y[k]){a++;if(y[k]===1)p++;}});
+  if(!a) return null;
+  return {a:a,p:p,cat:p===0?'well controlled':p<=2?'partly controlled':'uncontrolled'};
+}
+
+/* ---- food / drug helpers ---- */
+var ONSET=['Under 5 min','5-30 min','30-60 min','1-2 h','2-6 h','6-24 h','1 day or more'];
+function pos(get,id,opt){var m=get(id);return !!(m&&m[opt]===1);}
+function anyPos(get,id,list){return list.some(function(o){return pos(get,id,o);});}
+function onsetLines(get){
+  var o=(get('onset')||[])[0];
+  if(!o) return [];
+  var i=ONSET.indexOf(o);
+  if(i<=3) return ['Timing: onset within 2 h of exposure, consistent with an immediate (IgE-mediated) pattern'];
+  if(i===4) return ['Timing: onset 2-6 h after exposure; typical IgE reactions are earlier for foods (consider FPIES if repetitive vomiting), though immediate drug reactions can occur up to 6 h'];
+  return ['Timing: onset more than 6 h after exposure, a delayed (non-IgE) mechanism is more likely'];
+}
+var SK=['Hives (urticaria)','Angioedema (lips, face, eyes)','Generalized flushing'];
+var RS=['Wheeze','Stridor / hoarse voice / throat tightness','Shortness of breath','Hypoxia / cyanosis'];
+var CV=['Hypotension / collapse','Syncope / dizziness','Pallor or floppiness (infant)','Altered consciousness / sense of doom'];
+var GI=['Repetitive vomiting','Severe abdominal pain / cramps'];
+function anaLines(get){
+  var s=anyPos(get,'skin',SK),r=anyPos(get,'resp',RS),c=anyPos(get,'cv',CV),g=anyPos(get,'gi',GI),inv=[];
+  if(s) inv.push('skin/mucosal');if(r) inv.push('respiratory');if(c) inv.push('cardiovascular');if(g) inv.push('gastrointestinal');
+  if(!inv.length) return [];
+  var met=(s&&(r||c))||inv.length>=2||pos(get,'cv','Hypotension / collapse');
+  return ['Systems involved: '+inv.join(', '),'Anaphylaxis clinical criteria (NIAID/FAAN): '+(met?'MET (confirm exposure to a likely allergen)':'not met by the entered findings')];
+}
+var CUT=['Blistering / mucosal erosions / skin pain','Fever, facial edema, lymphadenopathy or organ involvement (DRESS features)'];
+function cutLines(get){
+  return anyPos(get,'nonige',CUT)?['WARNING: features of a severe cutaneous adverse reaction (SJS/TEN/DRESS). Avoid re-exposure, no skin test or challenge, urgent specialist review.']:[];
+}
+var PF=['Reaction within the last 5 years','Anaphylaxis / angioedema or severe cutaneous reaction','Treatment was required for the reaction'];
+function penLines(get){
+  var m=get('penfast')||{},n=Object.keys(m).length;
+  if(!n) return [];
+  var sc=(m[PF[0]]===1?2:0)+(m[PF[1]]===1?2:0)+(m[PF[2]]===1?1:0);
+  var b=sc===0?'very low (under 1%)':sc<=2?'low (about 5%)':sc===3?'moderate (about 20%)':'high (about 50%)';
+  return ['PEN-FAST '+sc+'/5: estimated chance of a positive penicillin allergy test '+b+' (adult-validated, limited pediatric data'+(n<3?'; incomplete, '+n+'/3 answered':'')+')'];
+}
+
+var CFG={
+ad:{key:'ad',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - ATOPIC DERMATITIS',sections:[
+ {id:'visit',title:'Visit and reason',items:[
+  C('vtype','Visit type',['New patient','Follow-up'],{single:1}),
+  N('agey','Age',{suf:' years',ph:'e.g. 3.5'}),
+  C('sex','Sex',['Male','Female'],{single:1}),
+  C('who','History from',['Mother','Father','Both parents','Other caregiver','Patient']),
+  T('cc','Reason for visit / referral',{full:1,ph:'e.g. Referred for recurrent itchy rash since infancy'}),
+  C('interval','Since last visit',['Better','Same','Worse','Recent flare'],{single:1})
+ ]},
+ {id:'hpi',title:'Onset, course and burden',items:[
+  C('onset','Age at onset',['Under 6 months','6 months to 2 years','2 to 5 years','6 to 11 years','12 years or older'],{single:1}),
+  C('course','Pattern',['Persistent','Relapsing-remitting','Seasonal flares','Currently in remission'],{single:1}),
+  C('sites','Current sites',SITES),
+  T('flares','Flares: frequency / duration / last flare',{full:1}),
+  N('itch','Itch NRS (0-10)',{suf:'/10',band:nrsBand}),
+  POEM,
+  Y('symp','Symptoms (past 2 weeks)',['Itch','Sleep disturbed by itch','Scratching / excoriations','Oozing / crusting','Bleeding','Skin pain or burning','Dry skin','Eye rubbing / itchy eyes','Missed school or daycare','Parental sleep disturbed'])
+ ]},
+ {id:'trig',title:'Triggers',items:[
+  Y('trig','Triggers',['Heat / sweating','Dry or cold air','Soaps / detergents','Wool / synthetic fabric','Fragrances / skin products','Saliva / drooling','Swimming / chlorine','Infections','Stress','Dust mite / bedding','Pollen / season','Animals','Foods (suspected)']),
+  T('foodtrig','Suspected foods and timing after eating',{full:1})
+ ]},
+ {id:'rx',title:'Skin care and treatment',items:[
+  T('bath','Bathing: frequency / duration / water temperature / cleanser',{full:1}),
+  C('emol','Emollient use',['Daily and regular','Only when flaring','Rare or none'],{single:1}),
+  T('emolx','Emollient type and amount'),
+  C('tcs','Topical corticosteroid',['Not used','Low potency','Medium potency','High potency','Very high potency']),
+  T('tcsx','TCS: name / sites / frequency / last use'),
+  C('topo','Other topical measures',['Calcineurin inhibitor','Crisaborole (PDE4)','Ruxolitinib cream (JAK)','Topical antibiotic','Bleach baths','Wet wraps']),
+  C('sys','Systemic or other therapy (current or past)',['Oral antihistamine','Oral corticosteroid','Cyclosporine','Methotrexate','Azathioprine / MMF','Dupilumab','Tralokinumab / lebrikizumab','Oral JAK inhibitor','Phototherapy','Antibiotic courses']),
+  T('sysx','Details: dates, response, courses in last 12 months',{full:1}),
+  C('adh','Adherence',['Good','Partial','Poor'],{single:1}),
+  Y('barr','Barriers',['Steroid phobia / safety concerns','Cost or access','Time-consuming','Child refuses','Instructions unclear'])
+ ]},
+ {id:'atopy',title:'Atopic comorbidity and food allergy',items:[
+  Y('co','Comorbidities',['Asthma / recurrent wheeze','Allergic rhinitis','Allergic conjunctivitis','IgE-mediated food allergy','EoE symptoms (dysphagia, vomiting, feeding problems)','Urticaria / angioedema','Anaphylaxis history','Chronic rhinosinusitis']),
+  T('fa','Food reactions: food / reaction / time to onset / last reaction / epinephrine',{full:1}),
+  Y('diet','Diet and growth',['Foods avoided without testing','Early allergen introduction (peanut/egg) done','Growth or feeding concerns'])
+ ]},
+ {id:'inf',title:'Skin infections',items:[
+  Y('inf','Infection history',['Recurrent impetigo / staph infections','Eczema herpeticum (painful punched-out vesicles)','Molluscum','Warts','Fungal infection','Signs of infection this flare'])
+ ]},
+ {id:'flags',title:'Red flags: other diagnosis or immune deficiency',items:[
+  Y('flags','Red flags',['Onset under 3 months, severe and refractory','Failure to thrive','2 or more deep-seated infections or pneumonias','Recurrent otitis / sinusitis (4 or more per year)','Chronic diarrhea','Easy bruising / petechiae / low platelets','Sparse brittle hair or ichthyosis','Retained primary teeth, fractures, cold abscesses','Family history of immunodeficiency or early deaths','Poor response to optimized therapy'])
+ ]},
+ {id:'fam',title:'Family, home and school',items:[
+  C('famhx','Family history',FAMHX),
+  Y('env','Home environment',['Tobacco / shisha / bakhoor smoke','Pets at home','Carpets / heavy bedding','Very dry or humid home','Daycare / school exposure']),
+  Y('soc','Other',['Immunizations up to date','Consanguinity','Self-esteem / bullying concern','Parental stress'])
+ ]},
+ {id:'exam',title:'Examination',items:[
+  T('vitals','Weight / height (percentiles)'),
+  C('viga','vIGA-AD',['0 clear','1 almost clear','2 mild','3 moderate','4 severe'],{single:1}),
+  N('bsa','BSA involved',{suf:'%'}),
+  EASIIT,
+  C('morph','Lesions',['Erythema','Papules','Excoriations','Lichenification','Xerosis','Oozing / crusting','Fissures','Edema','Hypopigmentation','Hyperpigmentation']),
+  C('dist','Distribution',SITES),
+  Y('feat','Atopic features',['Dennie-Morgan folds','Periorbital darkening','Hyperlinear palms','Keratosis pilaris','Pityriasis alba','Cheilitis','Allergic shiners / nasal crease']),
+  Y('comp','Complications',['Honey-crusted lesions (impetiginization)','Punched-out erosions / vesicles (eczema herpeticum)','Molluscum','Cellulitis / tender lymphadenopathy','Wheeze on auscultation']),
+  T('examx','Other findings',{full:1})
+ ]},
+ {id:'assess',title:'Assessment',items:[
+  C('sev','Severity',['Mild','Moderate','Severe'],{single:1}),
+  C('ctrl','Current control',['Controlled','Partially controlled','Uncontrolled'],{single:1}),
+  C('cmp','Complications / associations',['Secondary bacterial infection','Eczema herpeticum','Sleep disturbance','Psychosocial impact','Growth concern','Food allergy sensitization','None']),
+  T('assx','Assessment summary',{full:1,ph:'e.g. Moderate AD, partially controlled, adherence limited by steroid concerns'})
+ ],hint:function(get){
+  var p=[scoreText(POEM,get),scoreText(EASIIT,get)].filter(Boolean);
+  return p.length?'Scores so far: '+p.join('; '):'';
+ }},
+ {id:'plan',title:'Plan',items:[
+  C('p1','Skin care',['Liberal emollients at least 2x/day, soon after bathing','Short (5-10 min) lukewarm baths with soap-free cleanser','Trigger and irritant avoidance reviewed','Written eczema action plan given','Diluted bleach baths for recurrent infection'],{list:1}),
+  C('p2','Anti-inflammatory',['Continue current topical regimen','Start / adjust topical corticosteroid (details below)','Proactive therapy 2x/week to recurrent sites','Topical calcineurin inhibitor for face, folds or maintenance','Topical crisaborole or ruxolitinib','Wet-wrap therapy for flare'],{list:1}),
+  C('p3','Infection and itch',['Skin culture and antibiotic for secondary infection','Urgent antiviral assessment if eczema herpeticum suspected','Avoid sedating antihistamines for itch control','Itch and sleep strategies reviewed'],{list:1}),
+  C('p4','Work-up and escalation',['Food allergy testing only if history suggests a reaction','No empiric food elimination','Early allergen introduction counseling','Consider systemic or biologic therapy','Phototherapy referral','Dermatology referral','Immunology work-up (CBC, IgE, immunoglobulins)','Psychology / sleep support'],{list:1}),
+  T('pmeds','Medication details: name / dose / sites / frequency / duration',{full:1,area:1}),
+  C('fu','Follow-up',['2 weeks','4-6 weeks','3 months','6 months','Sooner if infection or worsening'],{single:1})
+ ]}
+]},
+
+asthma:{key:'asthma',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - BRONCHIAL ASTHMA',sections:[
+ {id:'visit',title:'Visit and reason',items:[
+  C('vtype','Visit type',['New patient','Follow-up'],{single:1}),
+  N('agey','Age',{suf:' years',ph:'e.g. 7'}),
+  C('sex','Sex',['Male','Female'],{single:1}),
+  C('who','History from',['Mother','Father','Both parents','Other caregiver','Patient']),
+  T('cc','Reason for visit / referral',{full:1,ph:'e.g. Recurrent cough and wheeze, poor control on current therapy'}),
+  T('dxinfo','Asthma diagnosis: age and how confirmed',{full:1}),
+  C('interval','Since last visit',['Better','Same','Worse','Recent exacerbation'],{single:1})
+ ]},
+ {id:'control',title:'Control over the past 4 weeks',items:[
+  Y('gina','GINA symptom control questions (Yes = present)',GINA),
+  CACT,
+  ACTQ,
+  N('saba','Reliever uses per week',{suf:' per week'}),
+  N('nights','Night symptoms per month',{suf:' per month'}),
+  N('missed','School days missed in last month',{suf:' days'})
+ ],calc:function(get){
+  var r=ginaCat(get);
+  return r?['GINA 4-item symptom control ('+r.a+'/4 answered, '+r.p+' positive): '+r.cat]:[];
+ }},
+ {id:'sx',title:'Symptoms and pattern',items:[
+  Y('sx','Symptoms',['Cough','Wheeze','Shortness of breath','Chest tightness','Cough / wheeze with exercise','Cough / wheeze with laughing or crying','Symptoms between viral illnesses','Night cough','Stops activity earlier than peers']),
+  C('pat','Pattern',['Intermittent','Persistent','Seasonal','Perennial','Viral-triggered','Exercise-induced']),
+  T('onset','Onset: age of first wheeze / cough',{full:1})
+ ]},
+ {id:'exac',title:'Exacerbations in the last 12 months',items:[
+  N('ocs','Oral steroid courses',{suf:''}),
+  N('ed','ED visits',{suf:''}),
+  N('adm','Hospital admissions',{suf:''}),
+  Y('exr','History',['ICU admission or ventilation ever','1 or more severe exacerbations in last 12 months','Last exacerbation within 3 months','Rapid-onset severe attacks']),
+  T('last','Last exacerbation: date / trigger / treatment',{full:1})
+ ]},
+ {id:'trig',title:'Triggers',items:[
+  Y('trig','Triggers',['Viral infections','Exercise','Cold air','Pollen / season','Dust mite','Pets / animals','Mold / damp','Cockroach / pests','Tobacco / shisha smoke','Bakhoor / incense / oud smoke','Dust storms / air pollution','Strong odors / perfume / cleaning products','Emotion / laughing','Foods','Reflux','NSAIDs / aspirin'])
+ ]},
+ {id:'meds',title:'Current therapy and technique',items:[
+  C('step','Current treatment step (GINA)',['Step 1','Step 2','Step 3','Step 4','Step 5'],{single:1}),
+  C('ctrl','Controller',['Low-dose ICS','Medium-dose ICS','High-dose ICS','ICS-LABA','ICS-formoterol (MART)','Montelukast','LAMA','Biologic','Allergen immunotherapy','None']),
+  C('rel','Reliever',['SABA','ICS-formoterol','Nebulized SABA']),
+  C('dev','Device',['pMDI + spacer','pMDI + spacer + mask','Dry powder inhaler','Nebulizer','Soft-mist inhaler']),
+  T('meds','Drug names, doses, frequency',{full:1}),
+  C('adh','Adherence',['Good','Misses 1-2 doses per week','Poor'],{single:1}),
+  Y('tech','Technique and plan',['Inhaler technique observed and correct','Technique taught / corrected (teach-back)','Has written asthma action plan','Action plan understood','Refills collected on time']),
+  Y('se','Side effects',['Oral thrush / hoarseness','Growth concern','Sleep / mood / behavior change (montelukast)','Tremor / palpitations (SABA)'])
+ ]},
+ {id:'cmb',title:'Comorbidities',items:[
+  Y('cmb','Comorbidities',['Allergic rhinitis','Chronic rhinosinusitis / adenoid symptoms','Atopic dermatitis','Food allergy','Reflux','Snoring / sleep apnea','Obesity','Anxiety / depression','Inspiratory noise with exercise (vocal cord dysfunction)'])
+ ]},
+ {id:'flags',title:'Red flags: reconsider the diagnosis',items:[
+  Y('flags','Red flags',['Symptoms since the neonatal period','Chronic wet cough over 4 weeks','Failure to thrive','Cough or choking with feeds / vomiting','Stridor, unilateral or monophonic wheeze','Abrupt onset (foreign body)','Digital clubbing','Recurrent pneumonia in the same area','Poor response to adequate controller','Nasal congestion / otitis since infancy (ciliary dyskinesia)','Recurrent sinopulmonary infections (immunodeficiency)','Family history of cystic fibrosis or immunodeficiency'])
+ ]},
+ {id:'fam',title:'Family, birth and home',items:[
+  C('famhx','Family history',FAMHX),
+  Y('birth','Birth and early life',['Prematurity','NICU / ventilation','Bronchiolitis / RSV admission','Maternal smoking in pregnancy','Breastfed']),
+  Y('env','Home',['Smoker in household','Pets','Carpets / soft toys','Damp / mold','Incense or indoor burning','Dusty air-conditioning']),
+  Y('soc','Prevention and access',['Influenza vaccine this season','Other immunizations up to date','Inhaler and action plan at school','Cost or access problems with medicines'])
+ ]},
+ {id:'exam',title:'Examination and tests',items:[
+  T('vitals','SpO2 / RR / HR'),
+  T('growth','Weight / height (percentiles)'),
+  T('spiro','Spirometry: FEV1 % predicted / FEV1:FVC / bronchodilator response',{full:1}),
+  N('feno','FeNO',{suf:' ppb'}),
+  T('pef','Peak flow (L/min or % predicted)'),
+  C('chest','Chest',['Clear','Expiratory wheeze','Diffuse wheeze','Prolonged expiration','Crackles','Decreased air entry','Retractions / increased work of breathing','Hyperinflation']),
+  Y('ent','ENT, skin and other',['Allergic shiners / nasal crease','Pale boggy turbinates','Nasal polyps','Pharyngeal cobblestoning','Eczema','Digital clubbing','Harrison groove']),
+  T('examx','Other findings',{full:1})
+ ]},
+ {id:'assess',title:'Assessment',items:[
+  C('ctrl2','Current control',['Well controlled','Partly controlled','Uncontrolled'],{single:1}),
+  C('sev','Severity',['Intermittent','Mild persistent','Moderate persistent','Severe persistent'],{single:1}),
+  C('phen','Phenotype',['Allergic','Non-allergic','Exercise-induced bronchoconstriction','Preschool viral-induced wheeze']),
+  Y('risk','Risk factors for exacerbation',['Poor adherence','Incorrect inhaler technique','Smoke exposure','Obesity','Uncontrolled allergic rhinitis','Low lung function','1 or more exacerbations in last 12 months']),
+  T('assx','Assessment summary',{full:1,ph:'e.g. Moderate persistent allergic asthma, partly controlled, technique and adherence issues'})
+ ],hint:function(get){
+  var p=[],r=ginaCat(get);
+  if(r) p.push('GINA '+r.p+'/4 positive = '+r.cat);
+  var a=scoreText(CACT,get),b=scoreText(ACTQ,get);
+  if(a) p.push(a);
+  if(b) p.push(b);
+  return p.length?'Suggested from entries: '+p.join('; '):'';
+ }},
+ {id:'plan',title:'Plan',items:[
+  C('p1','Treatment',['Continue current therapy','Step up','Step down after sustained control','Start controller','Switch device / add spacer','Start ICS-formoterol maintenance and reliever (age 6 and over)','Short oral steroid course given'],{list:1}),
+  T('pmeds','Medication details: name / dose / frequency / duration',{full:1,area:1}),
+  C('p2','Education and prevention',['Inhaler technique taught (teach-back)','Written asthma action plan given or updated','Trigger avoidance and smoke-free home','Influenza vaccine advised','School plan and medication form completed','Emergency warning signs reviewed'],{list:1}),
+  C('p3','Investigations and referral',['Spirometry / FeNO','Skin prick or specific IgE to aeroallergens','Treat allergic rhinitis','Consider allergen immunotherapy','Biologic evaluation (severe asthma)','Pulmonology referral','Chest X-ray','Sweat chloride / ciliary work-up','Immunology work-up'],{list:1}),
+  C('fu','Follow-up',['2-4 weeks','1-3 months','3 months','6 months','Sooner if symptoms worsen'],{single:1})
+ ]}
+]},
+
+food:{key:'food',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - FOOD / MEDICATION ALLERGY (SUSPECTED IgE-MEDIATED)',sections:[
+ {id:'visit',title:'Visit and referral',items:[
+  C('vtype','Visit type',['New patient','Follow-up'],{single:1}),
+  N('agey','Age',{suf:' years',ph:'e.g. 2.5'}),
+  C('sex','Sex',['Male','Female'],{single:1}),
+  C('who','History from',['Mother','Father','Both parents','Other caregiver','Patient']),
+  C('atype','Suspected allergen type',['Food','Medication','Both'],{single:1}),
+  T('cc','Referral source and question',{full:1,ph:'e.g. Referred by ED after hives and vomiting after egg; asking for confirmation and safe introduction'})
+ ]},
+ {id:'index',title:'Index reaction',items:[
+  T('culprit','Suspected food or drug',{full:1}),
+  C('foods','Food (if food)',['Cow milk','Egg','Peanut','Tree nuts','Sesame','Wheat','Soy','Fish','Shellfish','Fruit / vegetable','Legume (lentil, chickpea)','Other']),
+  C('drugs','Drug class (if medication)',['Penicillin / amoxicillin','Other beta-lactam / cephalosporin','Macrolide','Sulfonamide','NSAID / aspirin','Paracetamol','Anticonvulsant','Contrast media','Anesthetic / muscle relaxant','Vaccine','Other']),
+  T('when','Date / age at reaction'),
+  N('nrx','Number of reactions',{suf:''}),
+  C('route','Route',['Ingested','Skin contact','Inhaled','Injected','Topical']),
+  C('form','Form of food',['Raw / fresh','Cooked','Baked in a cake or biscuit','Processed product']),
+  T('dose','Amount eaten, or drug dose and day of therapy',{full:1}),
+  C('onset','Time from exposure to first symptoms',ONSET,{single:1}),
+  T('course','Course: progression, duration, how it resolved',{full:1}),
+  C('repro','Reproducibility',['Single episode','Repeated, same pattern','Inconsistent']),
+  Y('cof','Cofactors',['Exercise','NSAID use','Concurrent infection / fever','Menses','Fasting / stress','Alcohol (adolescent)']),
+  Y('prior','Exposure history',['Tolerated before the reaction','Tolerated since the reaction','Eats related foods or class without reaction','Concurrent viral illness (rash confounder)'])
+ ],calc:function(get){return onsetLines(get);}},
+ {id:'sx',title:'Reaction symptoms',items:[
+  Y('skin','Skin and mucosal',['Hives (urticaria)','Angioedema (lips, face, eyes)','Generalized flushing','Itch only','Oral itch / tingling only','Eczema flare']),
+  Y('resp','Respiratory',['Wheeze','Stridor / hoarse voice / throat tightness','Shortness of breath','Cough','Hypoxia / cyanosis','Sneezing / rhinorrhea / eye symptoms']),
+  Y('cv','Cardiovascular and neurologic',['Hypotension / collapse','Syncope / dizziness','Pallor or floppiness (infant)','Tachycardia','Altered consciousness / sense of doom']),
+  Y('gi','Gastrointestinal',['Repetitive vomiting','Severe abdominal pain / cramps','Diarrhea','Single vomit only'])
+ ],calc:function(get){return anaLines(get);}},
+ {id:'tx',title:'Treatment and outcome',items:[
+  Y('tx','Treatment received',['Oral antihistamine','Epinephrine IM','Nebulized bronchodilator','Systemic corticosteroid','IV fluids','ED visit','Hospital admission','ICU admission','Biphasic / recurrent symptoms']),
+  T('txd','Details: who treated, doses, response',{full:1})
+ ]},
+ {id:'nonige',title:'Non-IgE features and severe-reaction flags',items:[
+  Y('nonige','Features',['Repetitive vomiting 1-4 h after food with lethargy or pallor (FPIES)','Delayed symptoms over 6 h','Blood or mucus in stool (FPIAP)','Dysphagia, food impaction or chronic reflux (EoE)','Oral itch only with raw fruit or vegetables (pollen-food syndrome)','Symptoms with skin contact only','Blistering / mucosal erosions / skin pain','Fever, facial edema, lymphadenopathy or organ involvement (DRESS features)','Serum-sickness-like (joint pain, rash, fever 1-3 weeks later)','Benign delayed rash during a viral illness or antibiotic course'])
+ ],calc:function(get){return cutLines(get);}},
+ {id:'risk',title:'Atopic background and family',items:[
+  Y('co','Comorbidities and risk',['Asthma','Atopic dermatitis','Allergic rhinitis','Other food allergies','Eosinophilic esophagitis','Prior anaphylaxis','Known mast cell disorder / raised tryptase','Beta-blocker or ACE-inhibitor use']),
+  C('famhx','Family history',FAMHX),
+  T('growth','Growth and diet: foods tolerated, feeding concerns',{full:1})
+ ]},
+ {id:'fooddet',title:'Food details',items:[
+  Y('fdet','Early feeding and exposure',['Exclusive breastfeeding','Early allergen introduction (peanut / egg) done','Infant eczema before introduction','Baked milk or egg tolerated','Reaction at first known exposure','Reaction through breast milk or skin contact']),
+  T('frecent','Foods currently avoided and accidental exposures since',{full:1})
+ ]},
+ {id:'drugdet',title:'Drug details',items:[
+  T('dname','Drug / dose / route / duration before the reaction',{full:1}),
+  T('dind','Indication and illness at the time'),
+  T('dtol','Same or related drugs tolerated since (name, date)'),
+  T('dcon','Other drugs taken at the time'),
+  Y('penfast','PEN-FAST items (penicillin label)',PF),
+  Y('dlab','Label status',['Allergy label recorded in chart','Avoids the class now','Alternative antibiotic needed'])
+ ],calc:function(get){return penLines(get);}},
+ {id:'tests',title:'Testing',items:[
+  T('spt','Skin prick test: allergens tested and wheal sizes (with controls)',{full:1}),
+  N('sptmm','Largest SPT wheal',{suf:' mm',band:function(v){return v>=3?'positive (3 mm or more over negative control)':'below 3 mm';}}),
+  N('sige','Specific IgE of the main allergen',{suf:' kUA/L',band:function(v){return v>=0.35?'sensitized (0.35 or above); not proof of clinical allergy':'below 0.35';}}),
+  T('comp','Component IgE / tryptase / other results',{full:1}),
+  C('ofc','Challenge status',['Not done','Planned, supervised','Done: tolerated','Done: reacted','Not needed (clear recent reaction with positive IgE)']),
+  T('testx','Test dates and interpretation',{full:1})
+ ]},
+ {id:'exam',title:'Examination',items:[
+  T('vitals','SpO2 / RR / HR / BP'),
+  T('growth2','Weight / height (percentiles)'),
+  Y('ex','Findings now',['Urticaria / angioedema','Eczema','Wheeze','Allergic rhinitis signs','Oropharyngeal edema']),
+  T('examx','Other findings',{full:1})
+ ]},
+ {id:'assess',title:'Assessment',items:[
+  C('dx','Impression',['IgE-mediated food allergy, likely','IgE-mediated food allergy, confirmed (reaction plus sensitization)','Sensitization without clinical allergy, likely tolerant','Non-IgE food allergy (FPIES / FPIAP / EoE), separate pathway','Pollen-food syndrome','Immediate drug hypersensitivity, likely','Non-immediate benign drug rash','Severe cutaneous adverse reaction, avoid','Drug allergy label unlikely, candidate for de-labeling','Intolerance or non-allergic reaction']),
+  C('sev','Severity of index reaction',['Mild (skin only)','Moderate (multi-system, not life-threatening)','Severe (anaphylaxis)'],{single:1}),
+  Y('rf','Risk factors for severe reactions',['Asthma','Prior anaphylaxis','Adolescent age','Delayed epinephrine','Accidental exposures likely','Peanut / tree nut / sesame allergy','Limited access to emergency care']),
+  T('assx','Assessment summary',{full:1,ph:'e.g. Likely IgE-mediated egg allergy with anaphylaxis; supervised baked-egg introduction after testing'})
+ ],hint:function(get){
+  var p=[].concat(anaLines(get),penLines(get),cutLines(get));
+  return p.join(' | ');
+ }},
+ {id:'plan',title:'Plan',items:[
+  C('p1','Avoidance and safety',['Strict avoidance of the culprit (labels and cross-contact reviewed)','Allergy label updated in the chart','Medical alert bracelet advised','No re-exposure at home without instruction','Written anaphylaxis action plan given','School / daycare allergy plan completed'],{list:1}),
+  C('p2','Emergency medication',['Epinephrine auto-injector prescribed (weight-appropriate dose, 2 devices)','Auto-injector technique taught (teach-back)','Epinephrine IM first for anaphylaxis, then call emergency services','Antihistamine for mild skin symptoms only','Carry devices at all times and check expiry'],{list:1}),
+  C('p3','Diagnosis and de-labeling',['Skin prick test','Specific IgE / components','Baseline tryptase','Supervised oral food challenge planned','Baked milk / egg introduction if appropriate','Drug skin testing','Supervised drug provocation (direct oral challenge if low risk)','No testing or challenge: severe cutaneous reaction suspected','Repeat testing to monitor tolerance','Refer to tertiary center'],{list:1}),
+  C('p4','Nutrition and support',['Dietitian referral (elimination diet, growth)','Safe alternative drug identified','Continue tolerated foods','Atopic dermatitis / asthma control optimized','Cross-reactivity education'],{list:1}),
+  T('pmeds','Medication details: name / dose / device / duration',{full:1,area:1}),
+  C('fu','Follow-up',['1-2 weeks (results)','4-6 weeks','3 months','6 months','12 months for tolerance re-testing','Sooner if any reaction'],{single:1})
+ ]}
+]}
+};
+
+var S={tab:'ad',v:{ad:{},asthma:{},food:{}},skip:{ad:{},asthma:{},food:{}}};
+var UPD=[];
+var ORDER=['ad','asthma','food'];
+
+function g(k){return function(id){return S.v[k][id];};}
+function today(){var d=new Date();var m=d.getMonth()+1,dd=d.getDate();return d.getFullYear()+'-'+(m<10?'0':'')+m+'-'+(dd<10?'0':'')+dd;}
+
+function itemLines(it,get){
+  var v=get(it.id);
+  if(it.t==='s'){var t=scoreText(it,get);return t?[t]:null;}
+  if(it.t==='e'){
+    var e=scoreText(it,get);
+    if(!e) return null;
+    var r=easiCalc(get);
+    return [e,'EASI regions: '+r.parts.join('; ')];
+  }
+  if(it.t==='c'){
+    if(!v||!v.length) return null;
+    if(it.list) return [it.label+':'].concat(v.map(function(x){return '- '+x;}));
+    return [it.label+': '+v.join(', ')];
+  }
+  if(it.t==='y'){
+    if(!v) return null;
+    var p=it.list.filter(function(x){return v[x]===1;}),n=it.list.filter(function(x){return v[x]===-1;}),parts=[];
+    if(p.length) parts.push('positive for '+p.join(', '));
+    if(n.length) parts.push('denies '+n.join(', '));
+    return parts.length?[it.label+': '+parts.join('; ')]:null;
+  }
+  if(it.t==='n'){
+    if(v===undefined||String(v).trim()==='') return null;
+    var x=Number(v),s=it.label+': '+v+(it.suf||'');
+    if(it.band&&isFinite(x)){var b=it.band(x,get);if(b) s+=' ('+b+')';}
+    return [s];
+  }
+  if(!v||!String(v).trim()) return null;
+  return [it.label+': '+String(v).trim()];
+}
+
+function buildNote(){
+  var cfg=CFG[S.tab],get=g(S.tab),out=[];
+  var vt=(get('vtype')||[])[0];
+  out.push(cfg.title+(vt?' ('+vt.toUpperCase()+')':''));
+  out.push('Date: '+today());
+  cfg.sections.forEach(function(sec){
+    if(S.skip[S.tab][sec.id]) return;
+    var lines=[];
+    sec.items.forEach(function(it){var r=itemLines(it,get);if(r) Array.prototype.push.apply(lines,r);});
+    if(sec.calc) Array.prototype.push.apply(lines,sec.calc(get));
+    var nt=(get(sec.id+'_note')||'').trim();
+    if(nt) lines.push('Notes: '+nt);
+    if(lines.length){out.push('');out.push(sec.title.toUpperCase());Array.prototype.push.apply(out,lines);}
+  });
+  return out.join('\n');
+}
+
+function answered(cfg,sec){
+  var v=S.v[cfg.key],n=0;
+  sec.items.forEach(function(it){
+    var x=v[it.id];
+    if(it.t==='c'){if(x&&x.length)n++;}
+    else if(it.t==='y'||it.t==='s'){if(x)n+=Object.keys(x).length;}
+    else if(it.t==='e'){if(x)n+=Object.keys(x).filter(function(r){return x[r].a!==undefined;}).length;}
+    else if(x!==undefined&&String(x).trim()!=='')n++;
+  });
+  if((v[sec.id+'_note']||'').trim())n++;
+  return n;
+}
+
+function renderItem(cfg,it){
+  var k=cfg.key,w;
+  if(it.t==='c'){
+    w=el('div','item full');w.appendChild(el('span','lbl',it.label));
+    var row=el('div','chips');row.setAttribute('role','group');row.setAttribute('aria-label',it.label);
+    it.opts.forEach(function(o){
+      var b=el('button','chip',o);b.type='button';b.setAttribute('aria-pressed','false');
+      b.onclick=function(){
+        var cur=S.v[k][it.id]||[],nxt;
+        if(cur.indexOf(o)>-1) nxt=cur.filter(function(x){return x!==o;});
+        else nxt=it.single?[o]:cur.concat([o]);
+        S.v[k][it.id]=nxt;
+        var kids=row.children;for(var i=0;i<kids.length;i++) kids[i].setAttribute('aria-pressed',String(nxt.indexOf(it.opts[i])>-1));
+        refresh();
+      };
+      row.appendChild(b);
+    });
+    w.appendChild(row);return w;
+  }
+  if(it.t==='y'){
+    w=el('div','item full');
+    var h=el('div','tri-h');h.appendChild(el('span','lbl',it.label));
+    var act=el('span','tri-a'),allno=el('button','mini','All unanswered: No'),clr=el('button','mini','Clear');
+    allno.type='button';clr.type='button';act.append(allno,clr);h.appendChild(act);w.appendChild(h);
+    var rows=el('div','trows'),els=[];
+    var paint=function(){
+      var m=S.v[k][it.id]||{};
+      els.forEach(function(e){
+        var val=m[e.o]||0;
+        e.row.classList.toggle('y',val===1);
+        e.yes.classList.toggle('on',val===1);e.no.classList.toggle('on',val===-1);
+        e.yes.setAttribute('aria-pressed',String(val===1));e.no.setAttribute('aria-pressed',String(val===-1));
+      });
+    };
+    var setv=function(o,val){
+      var m=S.v[k][it.id]=S.v[k][it.id]||{};
+      if(m[o]===val) delete m[o];else m[o]=val;
+      paint();refresh();
+    };
+    it.list.forEach(function(o){
+      var r=el('div','trow'),l=el('span','tl',o),pm=el('span','pm');
+      var yes=el('button','tb yes','Yes'),no=el('button','tb no','No');
+      yes.type='button';no.type='button';
+      yes.setAttribute('aria-label','Yes: '+o);no.setAttribute('aria-label','No: '+o);
+      yes.onclick=function(){setv(o,1);};no.onclick=function(){setv(o,-1);};
+      pm.append(yes,no);r.append(l,pm);rows.appendChild(r);els.push({o:o,row:r,yes:yes,no:no});
+    });
+    allno.onclick=function(){var m=S.v[k][it.id]=S.v[k][it.id]||{};it.list.forEach(function(o){if(!m[o])m[o]=-1;});paint();refresh();};
+    clr.onclick=function(){S.v[k][it.id]={};paint();refresh();};
+    w.appendChild(rows);return w;
+  }
+  if(it.t==='s'){
+    w=el('div','item full');
+    var hs=el('div','tri-h');hs.appendChild(el('span','lbl',it.label));
+    var acts=el('span','tri-a'),sc=el('span','band'),clrs=el('button','mini','Clear');clrs.type='button';
+    acts.append(sc,clrs);hs.appendChild(acts);w.appendChild(hs);
+    var qw=el('div'),qrows=[];
+    var paints=function(){
+      var m=S.v[k][it.id]||{};
+      qrows.forEach(function(r,qi){
+        var kids=r.children;
+        for(var i=0;i<kids.length;i++) kids[i].setAttribute('aria-pressed',String(m[qi]===i+(it.min||0)));
+      });
+    };
+    it.qs.forEach(function(q,qi){
+      var r=el('div','q');r.appendChild(el('div','qt',q.q));
+      var ch=el('div','chips');
+      q.o.forEach(function(txt,oi){
+        var val=oi+(it.min||0),b=el('button','chip',val+'  '+txt);
+        b.type='button';b.setAttribute('aria-pressed','false');
+        b.onclick=function(){
+          var m=S.v[k][it.id]=S.v[k][it.id]||{};
+          if(m[qi]===val) delete m[qi];else m[qi]=val;
+          paints();refresh();
+        };
+        ch.appendChild(b);
+      });
+      r.appendChild(ch);qw.appendChild(r);qrows.push(ch);
+    });
+    clrs.onclick=function(){S.v[k][it.id]={};paints();refresh();};
+    w.appendChild(qw);
+    UPD.push(function(){sc.textContent=scoreText(it,g(k))||'';});
+    return w;
+  }
+  if(it.t==='e'){
+    w=el('div','item full');
+    var he=el('div','tri-h');he.appendChild(el('span','lbl',it.label));
+    var acte=el('span','tri-a'),se=el('span','band'),clre=el('button','mini','Clear');clre.type='button';
+    acte.append(se,clre);he.appendChild(acte);w.appendChild(he);
+    var wrap=el('div','easi-wrap'),tbl=el('table','easi'),thd=el('thead'),trh=el('tr');
+    trh.appendChild(el('th',null,'Region'));
+    trh.appendChild(el('th',null,'Area 0-6'));
+    SIGNS_S.forEach(function(s,i){var th=el('th',null,s);th.title=SIGNS[i]+' (0-3)';trh.appendChild(th);});
+    thd.appendChild(trh);tbl.appendChild(thd);
+    var tb=el('tbody'),sels=[];
+    var mk=function(max,label,onset){
+      var s=el('select');s.setAttribute('aria-label',label);
+      var o0=el('option','','');o0.value='';s.appendChild(o0);
+      for(var n=0;n<=max;n++){var o=el('option','',String(n));o.value=String(n);s.appendChild(o);}
+      s.onchange=onset;sels.push(s);return s;
+    };
+    REG.forEach(function(r,i){
+      var tr=el('tr');tr.appendChild(el('td',null,r.n));
+      var setf=function(field){
+        return function(ev){
+          var m=S.v[k][it.id]=S.v[k][it.id]||{};
+          var rv=m['r'+i]=m['r'+i]||{};
+          if(ev.target.value==='') delete rv[field];else rv[field]=Number(ev.target.value);
+          refresh();
+        };
+      };
+      var td=el('td');td.appendChild(mk(6,r.n+' area',setf('a')));tr.appendChild(td);
+      for(var j=0;j<4;j++){var tdj=el('td');tdj.appendChild(mk(3,r.n+' '+SIGNS[j],setf('s'+j)));tr.appendChild(tdj);}
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);wrap.appendChild(tbl);w.appendChild(wrap);
+    w.appendChild(el('div','legend','Area: 0 none, 1 under 10%, 2 10-29%, 3 30-49%, 4 50-69%, 5 70-89%, 6 90-100%. Signs: Ery erythema, Ind induration / papulation / edema, Exc excoriation, Lic lichenification; 0 none, 1 mild, 2 moderate, 3 severe. Uses the age field above for the regional weights.'));
+    clre.onclick=function(){S.v[k][it.id]={};sels.forEach(function(s){s.value='';});refresh();};
+    UPD.push(function(){se.textContent=scoreText(it,g(k))||'';});
+    return w;
+  }
+  if(it.t==='n'){
+    w=el('label','item');w.appendChild(el('span','lbl',it.label));
+    var nw=el('div','numwrap'),inp=el('input');inp.type='number';inp.inputMode='decimal';inp.min='0';inp.step='any';inp.id='f-'+k+'-'+it.id;
+    if(it.ph) inp.placeholder=it.ph;
+    var bd=el('span','band');
+    inp.oninput=function(){S.v[k][it.id]=inp.value;refresh();};
+    nw.append(inp,bd);w.appendChild(nw);
+    UPD.push(function(){
+      var v=S.v[k][it.id],x=Number(v);
+      bd.textContent=(it.band&&v!==undefined&&String(v).trim()!==''&&isFinite(x))?it.band(x,g(k)):'';
+    });
+    return w;
+  }
+  w=el('label','item'+(it.full?' full':''));w.appendChild(el('span','lbl',it.label));
+  var f=el(it.area?'textarea':'input');
+  if(it.area) f.rows=2;else f.type='text';
+  f.id='f-'+k+'-'+it.id;f.placeholder=it.ph||'';f.autocomplete='off';
+  f.oninput=function(){S.v[k][it.id]=f.value;refresh();};
+  w.appendChild(f);return w;
+}
+
+function renderSection(cfg,sec){
+  var k=cfg.key,card=el('section','sec');card.id='sec-'+k+'-'+sec.id;
+  var head=el('div','sec-h'),tg=el('button','sec-t');tg.type='button';tg.setAttribute('aria-expanded','true');
+  var meta=el('span','sec-meta','');tg.append(el('span','sec-name',sec.title),meta);
+  tg.onclick=function(){var c=card.classList.toggle('closed');tg.setAttribute('aria-expanded',String(!c));};
+  var sk=el('label','skip'),cb=el('input');cb.type='checkbox';cb.id='skip-'+k+'-'+sec.id;
+  sk.append(cb,el('span',null,'Skip'));
+  cb.onchange=function(){S.skip[k][sec.id]=cb.checked;card.classList.toggle('skipped',cb.checked);refresh();};
+  head.append(tg,sk);
+  var body=el('div','sec-b'),grid=el('div','grid');
+  sec.items.forEach(function(it){grid.appendChild(renderItem(cfg,it));});
+  grid.appendChild(renderItem(cfg,{t:'t',id:sec.id+'_note',label:'Notes',full:1,area:1,ph:'Free text for anything not listed'}));
+  var info=el('div','info');info.hidden=true;
+  body.append(grid,info);card.append(head,body);
+  UPD.push(function(){
+    var n=answered(cfg,sec);
+    meta.textContent=S.skip[k][sec.id]?'Skipped, not in note':(n?n+' answered':'');
+    var get=g(k),lines=[];
+    if(sec.hint){var h=sec.hint(get);if(h) lines.push(h);}
+    if(sec.calc) Array.prototype.push.apply(lines,sec.calc(get));
+    info.hidden=!lines.length;info.textContent='';
+    lines.forEach(function(l){
+      var d=el('div',/^WARNING/.test(l)?'warnline':null,l);info.appendChild(d);
+    });
+  });
+  return card;
+}
+
+function build(){
+  UPD=[];
+  var forms=$('#forms'),navs=$('#navs');forms.textContent='';navs.textContent='';
+  ORDER.forEach(function(key){
+    var cfg=CFG[key],wrap=el('div');wrap.id='form-'+key;wrap.hidden=(key!==S.tab);
+    var nav=el('div','nav');nav.id='nav-'+key;nav.hidden=(key!==S.tab);
+    cfg.sections.forEach(function(sec){
+      wrap.appendChild(renderSection(cfg,sec));
+      var b=el('button',null);b.type='button';
+      b.append(el('span','dot'),document.createTextNode(sec.title));
+      b.onclick=function(){
+        var card=document.getElementById('sec-'+key+'-'+sec.id);
+        if(card.classList.contains('closed')){card.classList.remove('closed');card.querySelector('.sec-t').setAttribute('aria-expanded','true');}
+        card.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+      };
+      nav.appendChild(b);
+      UPD.push(function(){
+        var skipped=!!S.skip[key][sec.id];
+        b.className=skipped?'sk':(answered(cfg,sec)?'on':'');
+      });
+    });
+    forms.appendChild(wrap);navs.appendChild(nav);
+  });
+}
+
+function refresh(){
+  UPD.forEach(function(f){f();});
+  $('#note').value=buildNote();
+}
+
+function toast(msg){
+  var t=$('#toast');t.textContent=msg;t.hidden=false;
+  clearTimeout(toast.id);toast.id=setTimeout(function(){t.hidden=true;},2200);
+}
+function copyNote(){
+  var ta=$('#note'),text=ta.value;
+  function fallback(){
+    document.body.classList.add('sheet');
+    ta.focus();ta.select();
+    var ok=false;try{ok=document.execCommand('copy');}catch(e){}
+    toast(ok?'Note copied':'Selected. Press Ctrl/Cmd+C to copy');
+  }
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){toast('Note copied');},fallback);
+  }else fallback();
+}
+
+function setTab(key){
+  S.tab=key;$('#app').dataset.tab=key;
+  ORDER.forEach(function(k){
+    $('#form-'+k).hidden=(k!==key);$('#nav-'+k).hidden=(k!==key);
+    $('#tab-'+k).setAttribute('aria-selected',String(k===key));
+  });
+  refresh();window.scrollTo(0,0);measure();
+}
+function measure(){
+  var h=$('#hdr').offsetHeight;
+  document.documentElement.style.setProperty('--hh',h+'px');
+}
+
+var armed=null;
+$('#reset').onclick=function(){
+  var b=$('#reset');
+  if(!armed){
+    b.textContent='Tap again to clear all';b.classList.add('warn');
+    armed=setTimeout(function(){armed=null;b.textContent='New patient';b.classList.remove('warn');},3000);
+    return;
+  }
+  clearTimeout(armed);armed=null;b.textContent='New patient';b.classList.remove('warn');
+  S.v={ad:{},asthma:{},food:{}};S.skip={ad:{},asthma:{},food:{}};
+  build();refresh();window.scrollTo(0,0);toast('Cleared. Ready for the next patient');
+};
+ORDER.forEach(function(k){$('#tab-'+k).onclick=function(){setTab(k);};});
+$('#copy1').onclick=copyNote;$('#copy2').onclick=copyNote;
+$('#peek').onclick=function(){
+  var open=document.body.classList.toggle('sheet');
+  $('#peek').textContent=open?'Hide preview':'Preview note';
+};
+$('#close').onclick=function(){document.body.classList.remove('sheet');$('#peek').textContent='Preview note';};
+
+build();refresh();measure();
+window.addEventListener('resize',measure);
+if(window.ResizeObserver){new ResizeObserver(measure).observe($('#hdr'));}
+})();
+</script>
+</body>
+</html>
