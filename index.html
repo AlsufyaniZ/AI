@@ -152,7 +152,7 @@ select{font-size:16px;padding:6px 4px;border:1px solid var(--line);border-radius
       <button class="mini" id="reset" type="button">New patient</button>
     </div>
     <div id="navs"></div>
-    <p class="tip">Tap Yes / No or a chip. Anything left blank stays out of the note. Scores add up as you answer. Skip drops a whole section. Nothing is saved or sent; avoid typing names or ID numbers.</p>
+    <p class="tip">Tap Yes / No or a chip. Anything left blank stays out of the note. Enter the age first: scores add up as you answer and show only for the ages they are validated in. Skip drops a whole section. Nothing is saved or sent; avoid typing names or ID numbers.</p>
   </header>
 
   <div class="layout">
@@ -170,7 +170,7 @@ select{font-size:16px;padding:6px 4px;border:1px solid var(--line);border-radius
     </aside>
   </div>
 
-  <p class="foot">Built from the AAAAI/ACAAI atopic dermatitis practice parameter, AAD atopic dermatitis guidelines, GINA, NAEPP EPR-3 and its 2020 update, the EAACI food allergy and anaphylaxis guidelines, the NIAID/FAAN anaphylaxis criteria, and the EAACI/AAAAI drug allergy practice parameters. Scores: POEM, EASI, C-ACT, ACT, PEN-FAST (adult-validated, limited pediatric data). Item wording is shortened; use the licensed questionnaires where required. Prompts support documentation and do not replace clinical judgment or local protocols.</p>
+  <p class="foot">Built from the AAAAI/ACAAI atopic dermatitis practice parameter, AAD atopic dermatitis guidelines, GINA, NAEPP EPR-3 and its 2020 update, the EAACI food allergy and anaphylaxis guidelines, the NIAID/FAAN anaphylaxis criteria, and the EAACI/AAAAI drug allergy practice parameters. Scores appear only for the ages they are validated in: POEM and EASI (children), itch NRS (8 years and over), C-ACT (4-11 years), ACT (12 years and over), plus the GINA symptom questions. Penicillin history uses a guideline-based low-risk screen, not an adult score. Item wording is shortened; use the licensed questionnaires where required. Prompts support documentation and do not replace clinical judgment or local protocols.</p>
 </div>
 
 <div class="bar" id="bar">
@@ -190,6 +190,26 @@ var N=function(id,label,o){return Object.assign({t:'n',id:id,label:label},o||{})
 var Y=function(id,label,list,o){return Object.assign({t:'y',id:id,label:label,list:list},o||{});};
 var SC=function(id,label,o){return Object.assign({t:'s',id:id,label:label},o||{});};
 
+/* ---- age in years + months, shared by all three tabs ---- */
+var AGE={t:'a',id:'agey',label:'Age'};
+function ageM(get){
+  var y=get('agey'),m=get('agem');
+  var hy=y!==undefined&&String(y).trim()!==''&&isFinite(Number(y));
+  var hm=m!==undefined&&String(m).trim()!==''&&isFinite(Number(m));
+  if(!hy&&!hm) return null;
+  return Math.round((hy?Number(y):0)*12+(hm?Number(m):0));
+}
+function ageText(am){
+  var y=Math.floor(am/12),m=am%12,p=[];
+  if(y) p.push(y+(y===1?' year':' years'));
+  if(m||!y) p.push(m+(m===1?' month':' months'));
+  return p.join(' ');
+}
+/* score availability by age (months) */
+var showCACT=function(get){var a=ageM(get);return a!==null&&a>=48&&a<144;};
+var showACT=function(get){var a=ageM(get);return a!==null&&a>=144;};
+var showNRS=function(get){var a=ageM(get);return a===null||a>=96;};
+
 var SITES=['Face','Scalp','Neck','Eyelids','Ears','Antecubital fossae','Popliteal fossae','Trunk','Extensor limbs','Hands','Feet','Diaper/genital area','Generalized'];
 var FAMHX=['Asthma','Eczema','Allergic rhinitis','Food allergy','Drug allergy','Urticaria','Immunodeficiency','No atopy'];
 
@@ -206,7 +226,7 @@ var POEM=SC('poem','POEM, past week',{short:'POEM',max:28,min:0,band:poemBand,qs
   {q:'Weeping or oozing',o:DAYS},{q:'Cracked skin',o:DAYS},{q:'Flaking off',o:DAYS},{q:'Dry or rough skin',o:DAYS}]});
 var PDAYS=['Every day','19-24 days','11-18 days','4-10 days','1-3 days','None'];
 var FREQ4=['All the time','Most of the time','Some of the time','Never'];
-var CACT=SC('cact','C-ACT (age 4-11)',{short:'C-ACT',max:27,min:0,band:cactBand,qs:[
+var CACT=SC('cact','C-ACT (age 4-11)',{short:'C-ACT',max:27,min:0,band:cactBand,show:showCACT,qs:[
   {q:'Child: asthma today',o:['Very bad','Bad','Good','Very good']},
   {q:'Child: problem when running, exercising or playing',o:['Big problem','Problem','Small problem','No problem']},
   {q:'Child: cough because of asthma',o:FREQ4},
@@ -214,7 +234,7 @@ var CACT=SC('cact','C-ACT (age 4-11)',{short:'C-ACT',max:27,min:0,band:cactBand,
   {q:'Parent: days with daytime asthma symptoms (last 4 weeks)',o:PDAYS},
   {q:'Parent: days with daytime wheezing (last 4 weeks)',o:PDAYS},
   {q:'Parent: days child woke at night from asthma (last 4 weeks)',o:PDAYS}]});
-var ACTQ=SC('act','ACT (age 12 and over)',{short:'ACT',max:25,min:1,band:actBand,qs:[
+var ACTQ=SC('act','ACT (age 12 and over)',{short:'ACT',max:25,min:1,band:actBand,show:showACT,qs:[
   {q:'Asthma kept you from usual activities (4 weeks)',o:['All the time','Most of the time','Some of the time','A little of the time','None of the time']},
   {q:'Shortness of breath',o:['More than once a day','Once a day','3-6 times a week','Once or twice a week','Not at all']},
   {q:'Night or early-morning waking from asthma',o:['4 or more nights a week','2-3 nights a week','Once a week','Once or twice','Not at all']},
@@ -226,8 +246,8 @@ var SIGNS=['Erythema','Induration / papulation / edema','Excoriation','Lichenifi
 var SIGNS_S=['Ery','Ind','Exc','Lic'];
 
 function easiCalc(get){
-  var v=get('easi')||{},ag=get('agey'),known=(ag!==undefined&&String(ag).trim()!==''&&isFinite(Number(ag)));
-  var young=known&&Number(ag)<8,tot=0,ans=0,miss=0,parts=[];
+  var v=get('easi')||{},am=ageM(get),known=(am!==null);
+  var young=known&&am<96,tot=0,ans=0,miss=0,parts=[];
   REG.forEach(function(r,i){
     var rv=v['r'+i]||{};
     if(rv.a===undefined) return;
@@ -262,7 +282,19 @@ function scoreText(it,get){
 }
 
 /* ---- asthma control from the four GINA questions ---- */
-var GINA=['Daytime symptoms more than 2x/week (more than 1x/week if age 5 or under)','Night waking or night cough due to asthma','Reliever needed more than 2x/week (more than 1x/week if age 5 or under)','Any activity limitation due to asthma'];
+var GINA=['day','night','rel','act'];
+function ginaLab(o,get){
+  var am=ageM(get),young=am!==null&&am<72,old=am!==null&&am>=72;
+  if(o==='day') return young?'Daytime symptoms more than once a week':old?'Daytime symptoms more than twice a week':'Daytime symptoms more than twice a week (once a week if age 5 or under)';
+  if(o==='night') return 'Night waking or night cough due to asthma';
+  if(o==='rel') return young?'Reliever needed more than once a week':old?'Reliever needed more than twice a week':'Reliever needed more than twice a week (once a week if age 5 or under)';
+  return young?'Activity limitation (runs or plays less, tires easily)':'Any activity limitation due to asthma';
+}
+function ginaInterp(get){
+  var r=ginaCat(get);
+  if(!r) return null;
+  return 'Interpretation: '+r.cat+' ('+r.p+' of 4 present'+(r.a<4?', '+r.a+' of 4 answered':'')+')';
+}
 function ginaCat(get){
   var y=get('gina')||{},a=0,p=0;
   GINA.forEach(function(k){if(y[k]){a++;if(y[k]===1)p++;}});
@@ -297,20 +329,22 @@ var CUT=['Blistering / mucosal erosions / skin pain','Fever, facial edema, lymph
 function cutLines(get){
   return anyPos(get,'nonige',CUT)?['WARNING: features of a severe cutaneous adverse reaction (SJS/TEN/DRESS). Avoid re-exposure, no skin test or challenge, urgent specialist review.']:[];
 }
-var PF=['Reaction within the last 5 years','Anaphylaxis / angioedema or severe cutaneous reaction','Treatment was required for the reaction'];
-function penLines(get){
-  var m=get('penfast')||{},n=Object.keys(m).length;
-  if(!n) return [];
-  var sc=(m[PF[0]]===1?2:0)+(m[PF[1]]===1?2:0)+(m[PF[2]]===1?1:0);
-  var b=sc===0?'very low (under 1%)':sc<=2?'low (about 5%)':sc===3?'moderate (about 20%)':'high (about 50%)';
-  return ['PEN-FAST '+sc+'/5: estimated chance of a positive penicillin allergy test '+b+' (adult-validated, limited pediatric data'+(n<3?'; incomplete, '+n+'/3 answered':'')+')'];
+var R1='Benign non-urticarial rash only',R2='Immediate features (hives, angioedema, wheeze, low blood pressure)',R3='Severe features (blistering, mucosal lesions, fever, organ involvement)',R4='Serum-sickness-like illness';
+function penInterp(get){
+  var m=get('penscr')||{};
+  if(m[R2]===1||m[R3]===1||m[R4]===1) return 'Interpretation: not low risk by history; allergist-led testing before any challenge (no challenge if severe cutaneous features)';
+  if(m[R1]===1&&m[R2]===-1&&m[R3]===-1&&m[R4]===-1) return 'Interpretation: low-risk history (benign rash only); candidate for a supervised direct oral amoxicillin challenge per drug allergy practice parameters';
+  return null;
 }
+var isFood=function(get){var a=(get('atype')||[])[0];return !a||a==='Food'||a==='Both';};
+var isDrug=function(get){var a=(get('atype')||[])[0];return !a||a==='Medication'||a==='Both';};
+var isPen=function(get){return (get('drugs')||[]).indexOf('Penicillin / amoxicillin')>-1;};
 
 var CFG={
 ad:{key:'ad',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - ATOPIC DERMATITIS',sections:[
  {id:'visit',title:'Visit and reason',items:[
   C('vtype','Visit type',['New patient','Follow-up'],{single:1}),
-  N('agey','Age',{suf:' years',ph:'e.g. 3.5'}),
+  AGE,
   C('sex','Sex',['Male','Female'],{single:1}),
   C('who','History from',['Mother','Father','Both parents','Other caregiver','Patient']),
   T('cc','Reason for visit / referral',{full:1,ph:'e.g. Referred for recurrent itchy rash since infancy'}),
@@ -321,10 +355,14 @@ ad:{key:'ad',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - ATOPIC DERMATITIS',sec
   C('course','Pattern',['Persistent','Relapsing-remitting','Seasonal flares','Currently in remission'],{single:1}),
   C('sites','Current sites',SITES),
   T('flares','Flares: frequency / duration / last flare',{full:1}),
-  N('itch','Itch NRS (0-10)',{suf:'/10',band:nrsBand}),
+  N('itch','Itch NRS (0-10)',{suf:'/10',band:nrsBand,show:showNRS}),
   POEM,
   Y('symp','Symptoms (past 2 weeks)',['Itch','Sleep disturbed by itch','Scratching / excoriations','Oozing / crusting','Bleeding','Skin pain or burning','Dry skin','Eye rubbing / itchy eyes','Missed school or daycare','Parental sleep disturbed'])
- ]},
+ ],hint:function(get){
+  var a=ageM(get);
+  if(a===null) return 'Enter age: scores are shown only for the ages they are validated in.';
+  return a<96?'Itch NRS is hidden under 8 years (self-report is not validated); POEM is parent-reported.':'';
+ }},
  {id:'trig',title:'Triggers',items:[
   Y('trig','Triggers',['Heat / sweating','Dry or cold air','Soaps / detergents','Wool / synthetic fabric','Fragrances / skin products','Saliva / drooling','Swimming / chlorine','Infections','Stress','Dust mite / bedding','Pollen / season','Animals','Foods (suspected)']),
   T('foodtrig','Suspected foods and timing after eating',{full:1})
@@ -379,7 +417,7 @@ ad:{key:'ad',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - ATOPIC DERMATITIS',sec
  }},
  {id:'plan',title:'Plan',items:[
   C('p1','Skin care',['Liberal emollients at least 2x/day, soon after bathing','Short (5-10 min) lukewarm baths with soap-free cleanser','Trigger and irritant avoidance reviewed','Written eczema action plan given','Diluted bleach baths for recurrent infection'],{list:1}),
-  C('p2','Anti-inflammatory',['Continue current topical regimen','Start / adjust topical corticosteroid (details below)','Proactive therapy 2x/week to recurrent sites','Topical calcineurin inhibitor for face, folds or maintenance','Topical crisaborole or ruxolitinib','Wet-wrap therapy for flare'],{list:1}),
+  C('p2','Anti-inflammatory',['Continue current topical regimen','Start or adjust topical corticosteroid','Proactive therapy 2x/week to recurrent sites','Topical calcineurin inhibitor for face, folds or maintenance','Topical crisaborole or ruxolitinib','Wet-wrap therapy for flare'],{list:1}),
   C('p3','Infection and itch',['Skin culture and antibiotic for secondary infection','Urgent antiviral assessment if eczema herpeticum suspected','Avoid sedating antihistamines for itch control','Itch and sleep strategies reviewed'],{list:1}),
   C('p4','Work-up and escalation',['Food allergy testing only if history suggests a reaction','No empiric food elimination','Early allergen introduction counseling','Consider systemic or biologic therapy','Phototherapy referral','Dermatology referral','Immunology work-up (CBC, IgE, immunoglobulins)','Psychology / sleep support'],{list:1}),
   T('pmeds','Medication details: name / dose / sites / frequency / duration',{full:1,area:1}),
@@ -390,7 +428,7 @@ ad:{key:'ad',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - ATOPIC DERMATITIS',sec
 asthma:{key:'asthma',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - BRONCHIAL ASTHMA',sections:[
  {id:'visit',title:'Visit and reason',items:[
   C('vtype','Visit type',['New patient','Follow-up'],{single:1}),
-  N('agey','Age',{suf:' years',ph:'e.g. 7'}),
+  AGE,
   C('sex','Sex',['Male','Female'],{single:1}),
   C('who','History from',['Mother','Father','Both parents','Other caregiver','Patient']),
   T('cc','Reason for visit / referral',{full:1,ph:'e.g. Recurrent cough and wheeze, poor control on current therapy'}),
@@ -398,15 +436,17 @@ asthma:{key:'asthma',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - BRONCHIAL ASTH
   C('interval','Since last visit',['Better','Same','Worse','Recent exacerbation'],{single:1})
  ]},
  {id:'control',title:'Control over the past 4 weeks',items:[
-  Y('gina','GINA symptom control questions (Yes = present)',GINA),
+  Y('gina','Asthma symptom control, past 4 weeks (GINA)',GINA,{qa:1,lab:ginaLab,interp:ginaInterp}),
   CACT,
   ACTQ,
   N('saba','Reliever uses per week',{suf:' per week'}),
   N('nights','Night symptoms per month',{suf:' per month'}),
   N('missed','School days missed in last month',{suf:' days'})
- ],calc:function(get){
-  var r=ginaCat(get);
-  return r?['GINA 4-item symptom control ('+r.a+'/4 answered, '+r.p+' positive): '+r.cat]:[];
+ ],hint:function(get){
+  var a=ageM(get);
+  if(a===null) return 'Enter age to show the matching control questionnaire (C-ACT 4-11 years, ACT 12 years and over).';
+  if(a<48) return 'No validated control questionnaire under 4 years; the GINA symptom questions apply.';
+  return a<144?'C-ACT shown (validated for ages 4-11).':'ACT shown (validated for ages 12 and over).';
  }},
  {id:'sx',title:'Symptoms and pattern',items:[
   Y('sx','Symptoms',['Cough','Wheeze','Shortness of breath','Chest tightness','Cough / wheeze with exercise','Cough / wheeze with laughing or crying','Symptoms between viral illnesses','Night cough','Stops activity earlier than peers']),
@@ -464,7 +504,7 @@ asthma:{key:'asthma',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - BRONCHIAL ASTH
  ],hint:function(get){
   var p=[],r=ginaCat(get);
   if(r) p.push('GINA '+r.p+'/4 positive = '+r.cat);
-  var a=scoreText(CACT,get),b=scoreText(ACTQ,get);
+  var a=showCACT(get)?scoreText(CACT,get):null,b=showACT(get)?scoreText(ACTQ,get):null;
   if(a) p.push(a);
   if(b) p.push(b);
   return p.length?'Suggested from entries: '+p.join('; '):'';
@@ -481,7 +521,7 @@ asthma:{key:'asthma',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - BRONCHIAL ASTH
 food:{key:'food',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - FOOD / MEDICATION ALLERGY (SUSPECTED IgE-MEDIATED)',sections:[
  {id:'visit',title:'Visit and referral',items:[
   C('vtype','Visit type',['New patient','Follow-up'],{single:1}),
-  N('agey','Age',{suf:' years',ph:'e.g. 2.5'}),
+  AGE,
   C('sex','Sex',['Male','Female'],{single:1}),
   C('who','History from',['Mother','Father','Both parents','Other caregiver','Patient']),
   C('atype','Suspected allergen type',['Food','Medication','Both'],{single:1}),
@@ -489,18 +529,19 @@ food:{key:'food',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - FOOD / MEDICATION 
  ]},
  {id:'index',title:'Index reaction',items:[
   T('culprit','Suspected food or drug',{full:1}),
-  C('foods','Food (if food)',['Cow milk','Egg','Peanut','Tree nuts','Sesame','Wheat','Soy','Fish','Shellfish','Fruit / vegetable','Legume (lentil, chickpea)','Other']),
-  C('drugs','Drug class (if medication)',['Penicillin / amoxicillin','Other beta-lactam / cephalosporin','Macrolide','Sulfonamide','NSAID / aspirin','Paracetamol','Anticonvulsant','Contrast media','Anesthetic / muscle relaxant','Vaccine','Other']),
+  C('foods','Food',['Cow milk','Egg','Peanut','Tree nuts','Sesame','Wheat','Soy','Fish','Shellfish','Fruit / vegetable','Legume (lentil, chickpea)','Other'],{show:isFood}),
+  C('drugs','Drug class',['Penicillin / amoxicillin','Other beta-lactam / cephalosporin','Macrolide','Sulfonamide','NSAID / aspirin','Paracetamol','Anticonvulsant','Contrast media','Anesthetic / muscle relaxant','Vaccine','Other'],{show:isDrug}),
   T('when','Date / age at reaction'),
   N('nrx','Number of reactions',{suf:''}),
   C('route','Route',['Ingested','Skin contact','Inhaled','Injected','Topical']),
-  C('form','Form of food',['Raw / fresh','Cooked','Baked in a cake or biscuit','Processed product']),
-  T('dose','Amount eaten, or drug dose and day of therapy',{full:1}),
+  C('form','Form of food',['Raw / fresh','Cooked','Baked in a cake or biscuit','Processed product'],{show:isFood}),
+  T('dosefood','Amount eaten',{full:1,show:isFood}),
+  T('dosedrug','Drug dose and day of therapy',{full:1,show:isDrug}),
   C('onset','Time from exposure to first symptoms',ONSET,{single:1}),
   T('course','Course: progression, duration, how it resolved',{full:1}),
   C('repro','Reproducibility',['Single episode','Repeated, same pattern','Inconsistent']),
   Y('cof','Cofactors',['Exercise','NSAID use','Concurrent infection / fever','Menses','Fasting / stress','Alcohol (adolescent)']),
-  Y('prior','Exposure history',['Tolerated before the reaction','Tolerated since the reaction','Eats related foods or class without reaction','Concurrent viral illness (rash confounder)'])
+  Y('prior','Exposure history',['Tolerated before the reaction','Tolerated since the reaction','Eats related foods or class without reaction','Concurrent viral illness'])
  ],calc:function(get){return onsetLines(get);}},
  {id:'sx',title:'Reaction symptoms',items:[
   Y('skin','Skin and mucosal',['Hives (urticaria)','Angioedema (lips, face, eyes)','Generalized flushing','Itch only','Oral itch / tingling only','Eczema flare']),
@@ -520,18 +561,18 @@ food:{key:'food',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - FOOD / MEDICATION 
   C('famhx','Family history',FAMHX),
   T('growth','Growth and diet: foods tolerated, feeding concerns',{full:1})
  ]},
- {id:'fooddet',title:'Food details',items:[
+ {id:'fooddet',title:'Food details',show:isFood,items:[
   Y('fdet','Early feeding and exposure',['Exclusive breastfeeding','Early allergen introduction (peanut / egg) done','Infant eczema before introduction','Baked milk or egg tolerated','Reaction at first known exposure','Reaction through breast milk or skin contact']),
   T('frecent','Foods currently avoided and accidental exposures since',{full:1})
  ]},
- {id:'drugdet',title:'Drug details',items:[
-  T('dname','Drug / dose / route / duration before the reaction',{full:1}),
+ {id:'drugdet',title:'Drug details',show:isDrug,items:[
+  T('dname','Drug, dose, route and duration before the reaction',{full:1}),
   T('dind','Indication and illness at the time'),
-  T('dtol','Same or related drugs tolerated since (name, date)'),
+  T('dtol','Same or related drugs tolerated since'),
   T('dcon','Other drugs taken at the time'),
-  Y('penfast','PEN-FAST items (penicillin label)',PF),
+  Y('penscr','Penicillin history: low-risk screen',[R1,R2,R3,R4],{qa:1,interp:penInterp,show:isPen}),
   Y('dlab','Label status',['Allergy label recorded in chart','Avoids the class now','Alternative antibiotic needed'])
- ],calc:function(get){return penLines(get);}},
+ ]},
  {id:'tests',title:'Testing',items:[
   T('spt','Skin prick test: allergens tested and wheal sizes (with controls)',{full:1}),
   N('sptmm','Largest SPT wheal',{suf:' mm',band:function(v){return v>=3?'positive (3 mm or more over negative control)':'below 3 mm';}}),
@@ -552,7 +593,7 @@ food:{key:'food',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - FOOD / MEDICATION 
   Y('rf','Risk factors for severe reactions',['Asthma','Prior anaphylaxis','Adolescent age','Delayed epinephrine','Accidental exposures likely','Peanut / tree nut / sesame allergy','Limited access to emergency care']),
   T('assx','Assessment summary',{full:1,ph:'e.g. Likely IgE-mediated egg allergy with anaphylaxis; supervised baked-egg introduction after testing'})
  ],hint:function(get){
-  var p=[].concat(anaLines(get),penLines(get),cutLines(get));
+  var p=[].concat(anaLines(get),cutLines(get));
   return p.join(' | ');
  }},
  {id:'plan',title:'Plan',items:[
@@ -566,15 +607,29 @@ food:{key:'food',title:'PEDIATRIC ALLERGY/IMMUNOLOGY CLINIC - FOOD / MEDICATION 
 ]}
 };
 
-var S={tab:'ad',v:{ad:{},asthma:{},food:{}},skip:{ad:{},asthma:{},food:{}}};
+/* wording used in the progress note when it differs from the on-screen prompt */
+var OUT={
+ad:{cc:'Reason for visit',itch:'Itch NRS',flares:'Flares',bath:'Bathing',tcsx:'Topical steroid details',sys:'Systemic or other therapy',sysx:'Systemic therapy details',fa:'Food reactions',pmeds:'Medication details',symp:'Symptoms in the past 2 weeks',vitals:'Weight and height'},
+asthma:{cc:'Reason for visit',dxinfo:'Asthma diagnosis',onset:'Onset',last:'Last exacerbation',meds:'Current medications',spiro:'Spirometry',pef:'Peak flow',step:'Current treatment step',vitals:'SpO2, RR, HR',growth:'Weight and height',pmeds:'Medication details'},
+food:{cc:'Referral',culprit:'Suspected allergen',when:'Date or age at reaction',course:'Course',txd:'Treatment details',growth:'Growth and diet',growth2:'Weight and height',vitals:'Vital signs',spt:'Skin prick test',comp:'Other results',testx:'Test interpretation',dname:'Drug, dose, route, duration',dind:'Indication',dtol:'Tolerated since',dcon:'Other drugs at the time',frecent:'Foods avoided and accidental exposures',pmeds:'Medication details',sptmm:'Largest skin prick wheal',sige:'Specific IgE'}
+};
+Object.keys(OUT).forEach(function(k){
+  CFG[k].sections.forEach(function(sec){
+    sec.items.forEach(function(it){if(OUT[k][it.id]) it.out=OUT[k][it.id];});
+  });
+});
+
+var S={tab:'ad',shared:{agey:'',agem:''},v:{ad:{},asthma:{},food:{}},skip:{ad:{},asthma:{},food:{}}};
 var UPD=[];
 var ORDER=['ad','asthma','food'];
 
-function g(k){return function(id){return S.v[k][id];};}
+function g(k){return function(id){if(id==='agey'||id==='agem') return S.shared[id];return S.v[k][id];};}
 function today(){var d=new Date();var m=d.getMonth()+1,dd=d.getDate();return d.getFullYear()+'-'+(m<10?'0':'')+m+'-'+(dd<10?'0':'')+dd;}
 
 function itemLines(it,get){
-  var v=get(it.id);
+  if(it.show&&!it.show(get)) return null;
+  var v=get(it.id),lab=it.out||it.label;
+  if(it.t==='a'){var am=ageM(get);return am===null?null:['Age: '+ageText(am)];}
   if(it.t==='s'){var t=scoreText(it,get);return t?[t]:null;}
   if(it.t==='e'){
     var e=scoreText(it,get);
@@ -584,24 +639,34 @@ function itemLines(it,get){
   }
   if(it.t==='c'){
     if(!v||!v.length) return null;
-    if(it.list) return [it.label+':'].concat(v.map(function(x){return '- '+x;}));
-    return [it.label+': '+v.join(', ')];
+    if(it.list) return [lab+':'].concat(v.map(function(x){return '- '+x;}));
+    return [lab+': '+v.join(', ')];
   }
   if(it.t==='y'){
     if(!v) return null;
+    if(it.qa){
+      var q=[lab+':'];
+      it.list.forEach(function(o){
+        if(v[o]) q.push('- '+(it.lab?it.lab(o,get):o)+': '+(v[o]===1?'Yes':'No'));
+      });
+      if(q.length===1) return null;
+      var ip=it.interp?it.interp(get):null;
+      if(ip) q.push(ip);
+      return q;
+    }
     var p=it.list.filter(function(x){return v[x]===1;}),n=it.list.filter(function(x){return v[x]===-1;}),parts=[];
     if(p.length) parts.push('positive for '+p.join(', '));
     if(n.length) parts.push('denies '+n.join(', '));
-    return parts.length?[it.label+': '+parts.join('; ')]:null;
+    return parts.length?[lab+': '+parts.join('; ')]:null;
   }
   if(it.t==='n'){
     if(v===undefined||String(v).trim()==='') return null;
-    var x=Number(v),s=it.label+': '+v+(it.suf||'');
+    var x=Number(v),s=lab+': '+v+(it.suf||'');
     if(it.band&&isFinite(x)){var b=it.band(x,get);if(b) s+=' ('+b+')';}
     return [s];
   }
   if(!v||!String(v).trim()) return null;
-  return [it.label+': '+String(v).trim()];
+  return [lab+': '+String(v).trim()];
 }
 
 function buildNote(){
@@ -611,20 +676,23 @@ function buildNote(){
   out.push('Date: '+today());
   cfg.sections.forEach(function(sec){
     if(S.skip[S.tab][sec.id]) return;
+    if(sec.show&&!sec.show(get)) return;
     var lines=[];
     sec.items.forEach(function(it){var r=itemLines(it,get);if(r) Array.prototype.push.apply(lines,r);});
     if(sec.calc) Array.prototype.push.apply(lines,sec.calc(get));
     var nt=(get(sec.id+'_note')||'').trim();
-    if(nt) lines.push('Notes: '+nt);
+    if(nt) lines.push(nt);
     if(lines.length){out.push('');out.push(sec.title.toUpperCase());Array.prototype.push.apply(out,lines);}
   });
   return out.join('\n');
 }
 
 function answered(cfg,sec){
-  var v=S.v[cfg.key],n=0;
+  var v=S.v[cfg.key],n=0,get=g(cfg.key);
   sec.items.forEach(function(it){
     var x=v[it.id];
+    if(it.show&&!it.show(get)) return;
+    if(it.t==='a'){if(ageM(get)!==null)n++;return;}
     if(it.t==='c'){if(x&&x.length)n++;}
     else if(it.t==='y'||it.t==='s'){if(x)n+=Object.keys(x).length;}
     else if(it.t==='e'){if(x)n+=Object.keys(x).filter(function(r){return x[r].a!==undefined;}).length;}
@@ -635,7 +703,29 @@ function answered(cfg,sec){
 }
 
 function renderItem(cfg,it){
+  var w=renderItem0(cfg,it);
+  if(it.show){UPD.push(function(){w.hidden=!it.show(g(cfg.key));});}
+  return w;
+}
+function renderItem0(cfg,it){
   var k=cfg.key,w;
+  if(it.t==='a'){
+    w=el('div','item');w.appendChild(el('span','lbl','Age'));
+    var ar=el('div','numwrap'),iy=el('input'),im=el('input'),at=el('span','band');
+    iy.type='number';im.type='number';iy.min='0';im.min='0';im.max='11';iy.inputMode='numeric';im.inputMode='numeric';
+    iy.placeholder='years';im.placeholder='months';iy.style.maxWidth='88px';im.style.maxWidth='88px';
+    iy.id='f-'+k+'-agey';im.id='f-'+k+'-agem';
+    iy.setAttribute('aria-label','Age in years');im.setAttribute('aria-label','Additional months');
+    iy.oninput=function(){S.shared.agey=iy.value;refresh();};
+    im.oninput=function(){S.shared.agem=im.value;refresh();};
+    ar.append(iy,im,at);w.appendChild(ar);
+    UPD.push(function(){
+      if(document.activeElement!==iy) iy.value=S.shared.agey;
+      if(document.activeElement!==im) im.value=S.shared.agem;
+      var a=ageM(g(k));at.textContent=a===null?'':ageText(a);
+    });
+    return w;
+  }
   if(it.t==='c'){
     w=el('div','item full');w.appendChild(el('span','lbl',it.label));
     var row=el('div','chips');row.setAttribute('role','group');row.setAttribute('aria-label',it.label);
@@ -674,13 +764,14 @@ function renderItem(cfg,it){
       paint();refresh();
     };
     it.list.forEach(function(o){
-      var r=el('div','trow'),l=el('span','tl',o),pm=el('span','pm');
+      var r=el('div','trow'),l=el('span','tl',it.lab?it.lab(o,g(k)):o),pm=el('span','pm');
       var yes=el('button','tb yes','Yes'),no=el('button','tb no','No');
       yes.type='button';no.type='button';
       yes.setAttribute('aria-label','Yes: '+o);no.setAttribute('aria-label','No: '+o);
       yes.onclick=function(){setv(o,1);};no.onclick=function(){setv(o,-1);};
-      pm.append(yes,no);r.append(l,pm);rows.appendChild(r);els.push({o:o,row:r,yes:yes,no:no});
+      pm.append(yes,no);r.append(l,pm);rows.appendChild(r);els.push({o:o,row:r,yes:yes,no:no,l:l});
     });
+    if(it.lab){UPD.push(function(){els.forEach(function(e){e.l.textContent=it.lab(e.o,g(k));});});}
     allno.onclick=function(){var m=S.v[k][it.id]=S.v[k][it.id]||{};it.list.forEach(function(o){if(!m[o])m[o]=-1;});paint();refresh();};
     clr.onclick=function(){S.v[k][it.id]={};paint();refresh();};
     w.appendChild(rows);return w;
@@ -791,6 +882,7 @@ function renderSection(cfg,sec){
   var info=el('div','info');info.hidden=true;
   body.append(grid,info);card.append(head,body);
   UPD.push(function(){
+    card.hidden=!!(sec.show&&!sec.show(g(k)));
     var n=answered(cfg,sec);
     meta.textContent=S.skip[k][sec.id]?'Skipped, not in note':(n?n+' answered':'');
     var get=g(k),lines=[];
@@ -822,6 +914,7 @@ function build(){
       nav.appendChild(b);
       UPD.push(function(){
         var skipped=!!S.skip[key][sec.id];
+        b.hidden=!!(sec.show&&!sec.show(g(key)));
         b.className=skipped?'sk':(answered(cfg,sec)?'on':'');
       });
     });
@@ -873,7 +966,7 @@ $('#reset').onclick=function(){
     return;
   }
   clearTimeout(armed);armed=null;b.textContent='New patient';b.classList.remove('warn');
-  S.v={ad:{},asthma:{},food:{}};S.skip={ad:{},asthma:{},food:{}};
+  S.v={ad:{},asthma:{},food:{}};S.skip={ad:{},asthma:{},food:{}};S.shared={agey:'',agem:''};
   build();refresh();window.scrollTo(0,0);toast('Cleared. Ready for the next patient');
 };
 ORDER.forEach(function(k){$('#tab-'+k).onclick=function(){setTab(k);};});
